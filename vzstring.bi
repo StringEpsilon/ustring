@@ -58,21 +58,37 @@ type VZString
 		' Initalizes the VZString by making a copy of the given VZString
 		declare constructor(value as vZString)
 		
-		' Clean up:
 		declare destructor()
 		
 		declare operator +=(byref value as zstring)
 		declare operator +=(value as vZstring)
 		declare operator +=(byref value as string)
-		
 		declare operator cast() byref as zstring
-		
 		declare operator [](index as uinteger) as ubyte		
 		
 		declare property Size() as uinteger
 		declare property Length() as uinteger
 		
-		' Functions
+		' TODO
+		declare function Mid(start as uinteger, lenght as uinteger) as vzstring 
+		
+		' TODO
+		declare function Left(lenght as uinteger) as vzstring
+		
+		' TODO
+		declare function Right(length as uinteger) as vzstring
+		
+		' TODO
+		declare function Instr(start as uinteger = 0, expression as vzstring) as uinteger
+		declare function Instr(start as uinteger = 0, byref expression as zstring) as uinteger
+		
+		' TODO
+		declare function InstrRev(start as uinteger = 0, expression as vzstring) as uinteger
+		declare function InstrRev(start as uinteger = 0, byref expression as zstring) as uinteger
+		
+		' TODO
+		declare static function space(length as uinteger) as vzstring 
+	private:
 		declare function GetGlyphCount() as uinteger
 end type
 
