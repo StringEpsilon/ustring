@@ -46,6 +46,7 @@ type VZString
 		_buffer as zstring ptr
 		_length as uinteger 		' The length, in bytes, of the string data.
 		_bufferSize as uinteger 	' The current size of the data buffer.
+		_glyphs as uinteger 		' Actual count of characters / glyphs.
 	
 	public:
 		' Initalizes the VZString with empty data
@@ -60,20 +61,23 @@ type VZString
 		' Clean up:
 		declare destructor()
 		
-		declare operator +=(value as zstring ptr)
+		declare operator +=(byref value as zstring)
 		declare operator +=(value as vZstring)
+		declare operator +=(byref value as string)
 		
 		declare operator cast() byref as zstring
 		
 		declare operator [](index as uinteger) as ubyte		
 		
+		declare property Size() as uinteger
+		declare property Length() as uinteger
+		
 		' Functions
 		declare function GetGlyphCount() as uinteger
-		
 end type
 
 operator len(value as vzstring) as integer
-	return value.GetGlyphCount
+	return value.Length
 end operator
 
 destructor VZString()
@@ -100,16 +104,17 @@ constructor VZString(value as vzstring)
 	memcpy( this._buffer, value._buffer, this._bufferSize )
 end constructor
 
-operator vZString.+=(value as zstring ptr)
-	if ( len(*value) < this._bufferSize - this._length) then
-		memcpy(this._buffer + this._length, value, len(*value))
-		this._length += len(*value)
+operator vZString.+=(byref value as zstring)
+	if ( len(value) < this._bufferSize - this._length) then
+		memcpy(this._buffer + this._length, @value, len(value))
+		this._length += len(value)
 	else
-		this._buffersize += len(*value)
+		this._buffersize += len(value)
 		this._buffer = reallocate(this._buffer, this._buffersize)
-		memcpy(this._buffer + this._length, value, len(value))
-		this._length += len(*value)
-	endif	
+		memcpy(this._buffer + this._length, @value, len(value))
+		this._length += len(value)
+	endif
+	this._glyphs = 0 ' reset the char count
 end operator
 
 operator vZString.+=(value as vzstring)
@@ -121,7 +126,21 @@ operator vZString.+=(value as vzstring)
 		this._buffer = reallocate(this._buffer, this._buffersize)
 		memcpy(this._buffer + this._length, value._buffer, value._length)
 		this._length += value._length
-	endif	
+	endif
+	this._glyphs = 0 ' reset the char count	
+end operator
+
+operator vZString.+=(byref value as string)
+	if ( len(value) < this._bufferSize - this._length) then
+		memcpy(this._buffer + this._length, @value, len(value))
+		this._length += len(value)
+	else
+		this._buffersize += len(value)
+		this._buffer = reallocate(this._buffer, this._buffersize)
+		memcpy(this._buffer + this._length, @value, len(value))
+		this._length += len(value)
+	endif
+	this._glyphs = 0 ' reset the char count
 end operator
 
 operator vzstring.[](index as uinteger) as ubyte
@@ -131,6 +150,17 @@ end operator
 operator vzstring.cast() byref as zstring
 	return *this._buffer
 end operator
+
+property vzstring.Length() as uinteger
+	if ( this._glyphs = 0) then
+		this._glyphs = this.GetGlyphCount()
+	end if
+	return this._glyphs
+end property
+
+property vzstring.Size() as uinteger
+	return this._length
+end property
 
 function vzstring.GetGlyphCount() as uinteger
 	return CountGlyphs(this._buffer)
