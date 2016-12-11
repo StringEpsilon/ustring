@@ -16,3 +16,41 @@ just like with regular FreeeBASIC strings.
 
 ```vzstring.+=```
 can be used to add additional characters, like you'd with regular strings. The operator accepts strings, vzstrings, and zstrings,
+
+```vzstring.Mid(start, length)```
+Behaves like MID(string, start, length), but uses the vzstring character count.
+Note: You can use the standard library MID() on vzstrings.
+
+Example:
+```
+dim test as vstring = "I ♥ FreeBASIC" ' the heart symbol is 3 codepoints long.
+print test.Mid(3,1) ' ♥
+print MID(test, 3, 3) ' ♥
+```
+
+```vzstring.Left(length)```
+Behaves like LEFT(string, length), but uses the vzstring character count.
+Note: You can not use the standard library LEFT() on vzstrings, until some bugs in the runtime are fixed.
+
+Example:
+```
+dim test as vstring = "I ♥ FreeBASIC" ' the heart symbol is 3 codepoints long.
+print test.Left(3) '>I ♥<
+```
+
+
+```vzstring.Right(length)```
+Behaves like RIGHT(string, length), but uses the vzstring character count.
+Note: You can not use the standard library RIGHT() on vzstrings, until some bugs in the runtime are fixed.
+
+
+```vzstring.Char(index) as vzstring```
+returns the character at the given index or zero length vzstring. This is zero indexed
+and based on the internal character counting.
+
+Example:
+```
+dim test as vstring = "I ♥ FreeBASIC"
+print test.char(2) ' "♥"
+
+```
