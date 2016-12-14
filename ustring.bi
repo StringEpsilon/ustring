@@ -9,17 +9,62 @@
 namespace ustringConstants
 
 const ChunkSize = 8 ' TODO: Find a good chunk size. 
+const replacementChar as string  = "�"
 
 end namespace
 
 ' TODOs:
 ' * Function to validate a UTF-8 string
-' * \uXXYY notation to UTF-8 codepoints
+' * 'DeescapeString" or something to actually use EscapedToUtf8()
+' * Make EscapedToUtf8() more robust (actually check for \u and u+, etc. 
+' * Create overloads of the de-escaper for zstrings and ustrings.
+
+function EscapedToUtf8(escapedPoint as string) as zstring ptr
+	escapedPoint = "&h" + right(escapedPoint, len(escapedPoint)-2)
+	dim as ulong codePoint = valulng(escapedPoint)
+	print bin(codePoint)
+	
+	dim result as ubyte ptr
+	
+	if codePoint <= &h7F then
+		result = allocate(1)
+		result[0] = codePoint
+		return result
+	endif
+	
+	if 	(&hD800 <= codepoint AND codepoint <= &hDFFF) OR _
+		(codepoint > &h10FFFD) then
+		return strptr(ustringConstants.replacementChar)
+	end if
+	
+	if (codepoint <= &h7FF) then
+		result = allocate(2)
+		result[0] = &hC0 OR (codepoint SHR 6) AND &h1F 
+		result[1] = &h80 OR codepoint AND &h3F
+		return result
+	end if
+	if (codepoint <= &hFFFF) then
+		result = allocate(3)
+        result[0] = &hE0 OR codepoint SHR 12 AND &hF
+        result[1] = &h80 OR codepoint SHR 6 AND &h3F
+        result[2] = &h80 OR codepoint AND &h3F
+        return result
+    end if
+	
+	result = allocate(4)
+	result[0] = &hF0 OR codepoint SHR 18 AND &h7
+	result[1] = &h80 OR codepoint SHR 12 AND &h3F
+	result[2] = &h80 OR codepoint SHR 6 AND &h3F
+	result[3] = &h80 OR codepoint AND &h3F
+    
+	return cast(zstring ptr,result)
+end function
 
 function GetCodepointLength(codepoint as ubyte) as ubyte
 	if codePoint <= &h7F then
 		return 1
 	else
+		' TODO: There must be a faster way.
 		if ( codePoint shr 5 ) = &b110 then
 			return 2
 		elseif ( codePoint shr 4 ) = &b1110 then
