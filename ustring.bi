@@ -12,6 +12,10 @@ const ChunkSize = 8 ' TODO: Find a good chunk size.
 const replacementChar as string  = "�"
 
 end namespace
+type _ustring as ustring 
+
+declare function EscapedToUtf8 overload (escapedPoint as zstring ptr) as zstring ptr
+declare function EscapedToUtf8 (escapedPoint as _ustring) as zstring ptr
 
 ' TODOs:
 ' * Function to validate a UTF-8 string
@@ -19,46 +23,6 @@ end namespace
 ' * Make EscapedToUtf8() more robust (actually check for \u and u+, etc. 
 ' * Create overloads of the de-escaper for zstrings and ustrings.
 
-function EscapedToUtf8(escapedPoint as string) as zstring ptr
-	escapedPoint = "&h" + right(escapedPoint, len(escapedPoint)-2)
-	dim as ulong codePoint = valulng(escapedPoint)
-	print bin(codePoint)
-	
-	dim result as ubyte ptr
-	
-	if codePoint <= &h7F then
-		result = allocate(1)
-		result[0] = codePoint
-		return result
-	endif
-	
-	if 	(&hD800 <= codepoint AND codepoint <= &hDFFF) OR _
-		(codepoint > &h10FFFD) then
-		return strptr(ustringConstants.replacementChar)
-	end if
-	
-	if (codepoint <= &h7FF) then
-		result = allocate(2)
-		result[0] = &hC0 OR (codepoint SHR 6) AND &h1F 
-		result[1] = &h80 OR codepoint AND &h3F
-		return result
-	end if
-	if (codepoint <= &hFFFF) then
-		result = allocate(3)
-        result[0] = &hE0 OR codepoint SHR 12 AND &hF
-        result[1] = &h80 OR codepoint SHR 6 AND &h3F
-        result[2] = &h80 OR codepoint AND &h3F
-        return result
-    end if
-	
-	result = allocate(4)
-	result[0] = &hF0 OR codepoint SHR 18 AND &h7
-	result[1] = &h80 OR codepoint SHR 12 AND &h3F
-	result[2] = &h80 OR codepoint SHR 6 AND &h3F
-	result[3] = &h80 OR codepoint AND &h3F
-    
-	return cast(zstring ptr,result)
-end function
 
 function GetCodepointLength(codepoint as ubyte) as ubyte
 	if codePoint <= &h7F then
@@ -111,9 +75,11 @@ type ustring
 		
 		declare operator +=(byref value as zstring)
 		declare operator +=(value as ustring)
-		declare operator +=(byref value as string)
+		'~ declare operator +=(byref value as string)
 		declare operator cast() byref as zstring
-		declare operator [](index as uinteger) as ubyte		
+		declare operator [](index as uinteger) as ubyte
+		
+		declare operator let(value as zstring ptr)		
 		
 		declare property Size() as uinteger
 		declare property Length() as uinteger
@@ -144,8 +110,32 @@ type ustring
 		declare function GetByteIndex(charindex as uinteger) as uinteger
 end type
 
+
+declare function left overload (value as _ustring, length as uinteger) as _ustring
+declare function right overload (value as _ustring, length as uinteger) as _ustring
+
+
 operator len(value as ustring) as integer
 	return value.Length
+end operator
+
+operator &(value as ustring, value2 as zstring ptr) as ustring
+	dim sum as ustring = value
+	value += value2
+	return value
+end operator
+
+operator ustring.let(value as zstring ptr)
+	if (len(*value) > 0 ) then
+		if (this._buffer <> 0) then 
+			deallocate(this._buffer)
+			
+		end if
+		this._length = len(*value)
+		this._bufferSize = (int( this._length / ChunkSize )+2) * ChunkSize
+		this._buffer = callocate(this._bufferSize)
+		memcpy(this._buffer, value, this._length)
+	end if
 end operator
 
 destructor ustring()
@@ -155,7 +145,7 @@ end destructor
 constructor ustring()
 	this._buffer = callocate(ChunkSize)
 	this._length = 0
-	this._bufferSize = 32
+	this._bufferSize = chunkSize
 end constructor
 
 constructor ustring(value as zstring ptr)
@@ -198,18 +188,18 @@ operator ustring.+=(value as ustring)
 	this._characters = 0 ' reset the char count	
 end operator
 
-operator ustring.+=(byref value as string)
-	if ( len(value) < this._bufferSize - this._length) then
-		memcpy(this._buffer + this._length, @value, len(value))
-		this._length += len(value)
-	else
-		this._buffersize += len(value)
-		this._buffer = reallocate(this._buffer, this._buffersize)
-		memcpy(this._buffer + this._length, @value, len(value))
-		this._length += len(value)
-	endif
-	this._characters = 0 ' reset the char count
-end operator
+'~ operator ustring.+=(byref value as string)
+	'~ if ( len(value) < this._bufferSize - this._length) then
+		'~ memcpy(this._buffer + this._length, @value, len(value))
+		'~ this._length += len(value)
+	'~ else
+		'~ this._buffersize += len(value)
+		'~ this._buffer = reallocate(this._buffer, this._buffersize)
+		'~ memcpy(this._buffer + this._length, @value, len(value))
+		'~ this._length += len(value)
+	'~ endif
+	'~ this._characters = 0 ' reset the char count
+'~ end operator
 
 operator ustring.[](index as uinteger) as ubyte
 	return this._buffer[index]
@@ -301,7 +291,6 @@ function ustring.Char(index as uinteger) as ustring
 		
 		charCount += 1
 		if charCount = index + 1 then 
-			
 			memcpy(value._buffer, this._buffer+j, l)
 			return value
 		end if
@@ -310,4 +299,89 @@ function ustring.Char(index as uinteger) as ustring
 		end if
 	loop until codepoint = 0
 	return value
+end function
+
+
+function EscapedToUtf8(escapedPoint as zstring ptr) as zstring ptr
+	dim as ulong codePoint = valulng("&h" & right(*escapedPoint, len(*escapedPoint)-2))	
+	dim result as ubyte ptr
+	
+	if codePoint <= &h7F then
+		result = allocate(1)
+		result[0] = codePoint
+		return result
+	endif
+	
+	if 	(&hD800 <= codepoint AND codepoint <= &hDFFF) OR _
+		(codepoint > &h10FFFD) then
+		return strptr(ustringConstants.replacementChar)
+	end if
+	
+	if (codepoint <= &h7FF) then
+		result = allocate(2)
+		result[0] = &hC0 OR (codepoint SHR 6) AND &h1F 
+		result[1] = &h80 OR codepoint AND &h3F
+		return result
+	end if
+	if (codepoint <= &hFFFF) then
+		result = allocate(3)
+        result[0] = &hE0 OR codepoint SHR 12 AND &hF
+        result[1] = &h80 OR codepoint SHR 6 AND &h3F
+        result[2] = &h80 OR codepoint AND &h3F
+        return result
+    end if
+	
+	result = allocate(4)
+	result[0] = &hF0 OR codepoint SHR 18 AND &h7
+	result[1] = &h80 OR codepoint SHR 12 AND &h3F
+	result[2] = &h80 OR codepoint SHR 6 AND &h3F
+	result[3] = &h80 OR codepoint AND &h3F
+    
+	return cast(zstring ptr,result)e
+end function
+
+function EscapedToUtf8(escapedPoint as ustring) as zstring ptr
+	dim as ulong codePoint = valulng("&h" & right(escapedPoint, len(escapedPoint)-2))	
+	dim result as ubyte ptr
+	
+	if codePoint <= &h7F then
+		result = allocate(1)
+		result[0] = codePoint
+		return result
+	endif
+	
+	if 	(&hD800 <= codepoint AND codepoint <= &hDFFF) OR _
+		(codepoint > &h10FFFD) then
+		return strptr(ustringConstants.replacementChar)
+	end if
+	
+	if (codepoint <= &h7FF) then
+		result = allocate(2)
+		result[0] = &hC0 OR (codepoint SHR 6) AND &h1F 
+		result[1] = &h80 OR codepoint AND &h3F
+		return result
+	end if
+	if (codepoint <= &hFFFF) then
+		result = allocate(3)
+        result[0] = &hE0 OR codepoint SHR 12 AND &hF
+        result[1] = &h80 OR codepoint SHR 6 AND &h3F
+        result[2] = &h80 OR codepoint AND &h3F
+        return result
+    end if
+	
+	result = allocate(4)
+	result[0] = &hF0 OR codepoint SHR 18 AND &h7
+	result[1] = &h80 OR codepoint SHR 12 AND &h3F
+	result[2] = &h80 OR codepoint SHR 6 AND &h3F
+	result[3] = &h80 OR codepoint AND &h3F
+    
+	return cast(zstring ptr,result)
+end function
+
+function left overload (value as _ustring, length as uinteger) as ustring
+	return left(*value._buffer, length)
+end function
+
+function right overload (value as _ustring, length as uinteger) as ustring
+	return right(*value._buffer, length)
 end function
