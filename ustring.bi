@@ -64,7 +64,7 @@ type ustring
 		_bufferSize as uinteger 	' The current size of the data buffer.
 		_characters as uinteger 	' Actual count of characters / glyphs.
 	'private:
-		declare function CharToByte(index as uinteger) as uinteger
+		declare function CharToByte(index as uinteger) as long
 	
 	public:
 		' Initalizes the ustring with empty data
@@ -109,7 +109,6 @@ type ustring
 		declare function Char(index as uinteger) as ustring
 	private:
 		declare function GetcharCount() as uinteger
-		declare function GetByteIndex(charindex as uinteger) as uinteger
 end type
 
 
@@ -212,7 +211,7 @@ function ustring.GetcharCount() as uinteger
 	return CountCharacters(this._buffer)
 end function
 
-function ustring.CharToByte(index as uinteger) as uinteger
+function ustring.CharToByte(index as uinteger) as long
 	dim codepoint as ubyte 
 	dim charIndex as uinteger = 0
 	dim byteIndex as uinteger = 0
@@ -230,7 +229,7 @@ end function
 
 function ustring.Instr(expression as ustring,start as uinteger = 0) as long
 	'Error case first:
-	dim as uinteger index = GetByteIndex(start)
+	dim as uinteger index = this.CharToByte(start)
 	if (index > this._length) then return -1
 	
 	dim as uinteger expressionLength = expression._length
@@ -260,48 +259,12 @@ function ustring.Instr(expression as ustring,start as uinteger = 0) as long
 	return -1
 end function
 
-function ustring.GetByteIndex(charindex as uinteger) as uinteger
-	dim charCount as uinteger
-	dim codePoint as ubyte = 0
-	dim as uinteger l
-	dim as uinteger value
-	dim as uinteger j
-	do
-		j += l
-		codePoint = peek(ubyte, this._buffer+j)
-		l = GetCodepointLength(codePoint)
-		
-		charCount += 1
-		if charCount = charindex + 1 then 
-			return j
-		end if
-		if codepoint = 0 then
-			return j
-		end if
-	loop until codepoint = 0
-	return value
-end function
-
 function ustring.Char(index as uinteger) as ustring
-	dim charCount as uinteger
-	dim codePoint as ubyte = 0
-	dim as uinteger l
 	dim as ustring value
-	dim as uinteger j
-	do
-		j += l
-		codePoint = peek(ubyte, this._buffer+j)
-		l = GetCodepointLength(codePoint)
-		
-		charCount += 1
-		if charCount = index + 1 then 
-			memcpy(value._buffer, this._buffer+j, l)
-			return value
-		end if
-		if codepoint = 0 then
-			return value
-		end if
-	loop until codepoint = 0
+	dim i as long =  this.CharToByte(index)
+	if (i <> -1) then
+		memcpy(value._buffer, this._buffer + index, GetCodePointLength(peek(ubyte, this._buffer + i)))
+	end if
 	return value
 end function
 
