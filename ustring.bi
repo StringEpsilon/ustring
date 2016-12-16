@@ -1,43 +1,46 @@
 /'	
 	This Source Code Form is subject to the terms of the Mozilla Public
 	License, v. 2.0. If a copy of the MPL was not distributed with this
-	file, You can obtain one at http://mozilla.org/MPL/2.0/. 
+	file, You can obtain one at http://mozilla.org/MPL/2.0/.
+	
+	(c) 2016 - StringEpsilon. 
 '/
+
+' TODOs:
+' * Function to validate a UTF-8 string
+' * 'DeescapeString" or something to actually use EscapedToUtf8()
+' * Make EscapedToUtf8() more robust (actually check for \u and u+, etc. )
 
 #include once "crt.bi"
 
 namespace ustringConstants
 
-const ChunkSize = 8 ' TODO: Find a good chunk size. 
-const replacementChar as string  = "�"
+	dim shared as ubyte charLenghtLookup(256) = _
+		{ _
+			1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, _
+			1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, _
+			1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, _
+			1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, _
+			1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, _
+			1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, _
+			2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, _
+			3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3, 4,4,4,4,4,4,4,4,5,5,5,5,6,6,6,6 _
+		}
+
+	#define GetCodepointLength(codepoint) (ustringConstants.charLenghtLookup(codepoint))
+
+	#ifndef NUL
+	const NUL = 0
+	#endif
+	const ChunkSize = 8 ' TODO: Find a good chunk size. 
+	const replacementChar as string  = "�"
 
 end namespace
+
 type _ustring as ustring 
 
 declare function EscapedToUtf8 overload (escapedPoint as zstring ptr) as zstring ptr
 declare function EscapedToUtf8 (escapedPoint as _ustring) as zstring ptr
-
-' TODOs:
-' * Function to validate a UTF-8 string
-' * 'DeescapeString" or something to actually use EscapedToUtf8()
-' * Make EscapedToUtf8() more robust (actually check for \u and u+, etc. 
-' * Create overloads of the de-escaper for zstrings and ustrings.
-
-
-function GetCodepointLength(codepoint as ubyte) as ubyte
-	if codePoint <= &h7F then
-		return 1
-	else
-		' TODO: There must be a faster way.
-		if ( codePoint shr 5 ) = &b110 then
-			return 2
-		elseif ( codePoint shr 4 ) = &b1110 then
-			return 3
-		elseif  ( codePoint shr 3 ) = &b11110 then
-			return 4
-		end if
-	end if
-end function
 
 function CountCharacters(utf8string as ubyte ptr) as uinteger
 	dim charCount as uinteger
@@ -59,7 +62,7 @@ type ustring
 		_buffer as zstring ptr
 		_length as uinteger 		' The length, in bytes, of the string data.
 		_bufferSize as uinteger 	' The current size of the data buffer.
-		_characters as uinteger 		' Actual count of characters / glyphs.
+		_characters as uinteger 	' Actual count of characters / glyphs.
 	
 	public:
 		' Initalizes the ustring with empty data
@@ -87,19 +90,16 @@ type ustring
 		' TODO
 		declare function Mid(start as uinteger, lenght as uinteger) as ustring 
 		
-		' TODO
 		declare function Left(lenght as uinteger) as ustring
-		
-		' TODO
 		declare function Right(length as uinteger) as ustring
 		
 		' TODO
-		declare function Instr( expression as ustring,start as uinteger = 0) as long
-		declare function Instr(start as uinteger = 0, byref expression as zstring) as long
+		declare function Instr(expression as ustring,start as uinteger = 0) as long
+		declare function Instr(byref expression as zstring, start as uinteger = 0) as long
 		
 		' TODO
-		declare function InstrRev(start as uinteger = 0, expression as ustring) as long
-		declare function InstrRev(start as uinteger = 0, byref expression as zstring) as long
+		declare function InstrRev(expression as ustring, start as uinteger = 0) as long
+		declare function InstrRev(byref expression as zstring, start as uinteger = 0) as long
 		
 		' TODO
 		declare static function space(length as uinteger) as ustring
@@ -111,9 +111,8 @@ type ustring
 end type
 
 
-declare function left overload (value as _ustring, length as uinteger) as _ustring
-declare function right overload (value as _ustring, length as uinteger) as _ustring
-
+declare function left overload (value as ustring, length as uinteger) as ustring
+declare function right overload (value as ustring, length as uinteger) as ustring
 
 operator len(value as ustring) as integer
 	return value.Length
@@ -187,19 +186,6 @@ operator ustring.+=(value as ustring)
 	endif
 	this._characters = 0 ' reset the char count	
 end operator
-
-'~ operator ustring.+=(byref value as string)
-	'~ if ( len(value) < this._bufferSize - this._length) then
-		'~ memcpy(this._buffer + this._length, @value, len(value))
-		'~ this._length += len(value)
-	'~ else
-		'~ this._buffersize += len(value)
-		'~ this._buffer = reallocate(this._buffer, this._buffersize)
-		'~ memcpy(this._buffer + this._length, @value, len(value))
-		'~ this._length += len(value)
-	'~ endif
-	'~ this._characters = 0 ' reset the char count
-'~ end operator
 
 operator ustring.[](index as uinteger) as ubyte
 	return this._buffer[index]
@@ -337,7 +323,7 @@ function EscapedToUtf8(escapedPoint as zstring ptr) as zstring ptr
 	result[2] = &h80 OR codepoint SHR 6 AND &h3F
 	result[3] = &h80 OR codepoint AND &h3F
     
-	return cast(zstring ptr,result)e
+	return cast(zstring ptr,result)
 end function
 
 function EscapedToUtf8(escapedPoint as ustring) as zstring ptr
@@ -379,6 +365,7 @@ function EscapedToUtf8(escapedPoint as ustring) as zstring ptr
 end function
 
 function left overload (value as _ustring, length as uinteger) as ustring
+	
 	return left(*value._buffer, length)
 end function
 
