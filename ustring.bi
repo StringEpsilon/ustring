@@ -63,6 +63,8 @@ type ustring
 		_length as uinteger 		' The length, in bytes, of the string data.
 		_bufferSize as uinteger 	' The current size of the data buffer.
 		_characters as uinteger 	' Actual count of characters / glyphs.
+	'private:
+		declare function CharToByte(index as uinteger) as uinteger
 	
 	public:
 		' Initalizes the ustring with empty data
@@ -208,6 +210,22 @@ end property
 
 function ustring.GetcharCount() as uinteger
 	return CountCharacters(this._buffer)
+end function
+
+function ustring.CharToByte(index as uinteger) as uinteger
+	dim codepoint as ubyte 
+	dim charIndex as uinteger = 0
+	dim byteIndex as uinteger = 0
+	do
+		codePoint = peek(ubyte, this._buffer + byteIndex)
+		if codepoint = 0 then 
+			return -1
+		end if
+		
+		if index = charIndex then return byteIndex
+		charIndex += 1
+		byteIndex += GetCodepointLength(codePoint)
+	loop until codepoint = 0
 end function
 
 function ustring.Instr(expression as ustring,start as uinteger = 0) as long
@@ -365,10 +383,9 @@ function EscapedToUtf8(escapedPoint as ustring) as zstring ptr
 end function
 
 function left overload (value as _ustring, length as uinteger) as ustring
-	
-	return left(*value._buffer, length)
+	return left(*value._buffer, value.CharToByte(length))
 end function
 
 function right overload (value as _ustring, length as uinteger) as ustring
-	return right(*value._buffer, length)
+	return *(value._buffer + value.CharToByte(len(value)-length) ) 
 end function
