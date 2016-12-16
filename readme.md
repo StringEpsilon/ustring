@@ -2,6 +2,20 @@ Wrapper class for a variable length zstring
 
 This implementation will allocate slightly more memory for each string than nescessary, to speed up some concatenations. You can modify this behavior by adjusting the constants in the ustringConstants namespace at the beginning of the file.
 
+## License:
+
+MPL 2.0. 
+* You can use, modify and distribute ustring as you please. You can even include it in proprietary projects.
+* You if you distribute a binary of your project, you must also provide the source code file ustring.bi you used (copyleft).
+* All other code in your project remains under your license.
+
+See COPYING for more details.
+
+## Current status:
+
+Useable, but not all that useful as of now. Some functions are not implemented and I have not tested the performance. If you decide to use it now, prepare for some minor API changes in the future.
+And please make use of the bug tracker.
+
 ## Goals:
 
 * A variable length zstring, that behaves like a normal zstring.
