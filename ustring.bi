@@ -37,14 +37,14 @@ namespace ustringConstants
 
 end namespace
 
-function CountCharacters(byval utf8string as ubyte ptr) as uinteger
-	dim charCount as uinteger = -1
+function CountCharacters(byval utf8string as string) as uinteger
+	dim charCount as uinteger
 	dim codePoint as ubyte
-	do
-		codePoint = *utf8string
-		utf8string += GetCodepointLength(codePoint)
-	loop until codepoint = 0 
-	charCount -= 1 'subtract the NUL byte.
+	for i as integer = 0 to len(utf8string) -1
+		codePoint = utf8string[i]
+		i += ( GetCodepointLength(codePoint) - 1)
+		charCount += 1 
+	next
 	return charCount
 end function
 
@@ -54,57 +54,53 @@ using ustringConstants
 type ustring 
 	' Private in the future. Don't use those.
 	'private:
-		_buffer as zstring ptr
+		_buffer as string
 		_length as uinteger 		' The length, in bytes, of the string data.
-		_bufferSize as uinteger 	' The current size of the data buffer.
 		_characters as uinteger 	' Actual count of characters / glyphs.
-		declare function CharToByte(byval index as uinteger) as long
-	
+		declare function CharToByte(byval index as uinteger) as long	
 	public:
 		' Initalizes the ustring with empty data
 		declare constructor()
 		
-		' Initalizes the ustring with the given zstring value
-		declare constructor(byval value as zstring ptr)
+		' Initalizes the ustring with the given string value
+		declare constructor(byval value as string)
 		
 		' Initalizes the ustring by making a copy of the given ustring
 		declare constructor(byref value as ustring)
 		
 		declare destructor()
 		
-		declare operator +=(byref value as zstring)
+		declare operator +=(byref value as string)
 		declare operator +=(byref value as ustring)
 		'~ declare operator +=(byref value as string)
-		declare operator cast() byref as zstring
+		declare operator cast() byref as string
 		declare operator [](byval index as uinteger) as ustring
 		
-		declare operator let(byref value as zstring ptr)
+		declare operator let(byref value as string)
 		
 		declare property Size() as uinteger
 		declare property Length() as uinteger
 		
 		' TODO
-		declare function Mid(byval start as uinteger, byval lenght as uinteger) as ustring 
+		'declare function Mid(byval start as uinteger, byval lenght as uinteger) as ustring 
 		
 		declare function Left(byval lenght as uinteger) as ustring
 		declare function Right(byval length as uinteger) as ustring
 		
 		' TODO
 		declare function Instr(byref expression as ustring, byval start as uinteger = 0) as long
-		declare function Instr(byref expression as zstring, byval start as uinteger = 0) as long
+		declare function Instr(byref expression as string, byval start as uinteger = 0) as long
 		
 		' TODO
 		declare function InstrRev(byref xpression as ustring, byval start as uinteger = 0) as long
-		declare function InstrRev(byref expression as zstring, byval start as uinteger = 0) as long
+		declare function InstrRev(byref expression as string, byval start as uinteger = 0) as long
 		
 		' TODO
 		declare static function space(byval length as uinteger) as ustring
-	private:
-		declare function GetcharCount() as uinteger
 end type
 
-declare function EscapedToUtf8 overload (byval escapedPoint as zstring ptr) as zstring ptr
-declare function EscapedToUtf8 (byref escapedPoint as ustring) as zstring ptr
+declare function EscapedToUtf8 overload (byval escapedPoint as string) as string
+declare function EscapedToUtf8 (byref escapedPoint as ustring) as string
 
 declare function left overload (byref value as ustring, byval length as uinteger) as ustring
 declare function right overload (byref value as ustring, byval length as uinteger) as ustring
@@ -113,82 +109,53 @@ operator len(byref value as ustring) as integer
 	return value.Length
 end operator
 
-operator &(byref value as ustring, byref value2 as zstring ptr) as ustring
+operator &(byref value as ustring, byref value2 as string) as ustring
 	dim sum as ustring = value
 	sum += value2
 	return sum
 end operator
 
-operator ustring.let(byref value as zstring ptr)
-	if (len(*value) > 0 ) then
-		if (this._buffer <> 0) then 
-			deallocate(this._buffer)
-			
-		end if
-		this._length = len(*value)
-		this._bufferSize = (this._length \ ChunkSize + 2) * ChunkSize
-		this._buffer = callocate(this._bufferSize)
-		memcpy(this._buffer, value, this._length)
+operator ustring.let(byref value as string)
+	if (len(value) > 0 ) then
+		this._length = len(value)
+		this._buffer = value
 	end if
 end operator
 
 destructor ustring()
-	deallocate(this._buffer)
 end destructor
 
 constructor ustring()
-	this._buffer = callocate(ChunkSize)
 	this._length = 0
-	this._bufferSize = chunkSize
 end constructor
 
-constructor ustring(byval value as zstring ptr)
-	this._length = len(*value)
-	this._bufferSize = (this._length \ ChunkSize + 2) * ChunkSize
-	this._buffer = callocate(this._bufferSize)
-	memcpy( this._buffer, value, this._length )
+constructor ustring(byval value as string)
+	this._length = len(value)
+	this._buffer = value
 end constructor
 
 constructor ustring(byref value as ustring)
 	this._length = value._length
-	this._bufferSize = value._bufferSize
-	this._buffer = allocate(this._bufferSize)
-	memcpy( this._buffer, value._buffer, this._bufferSize )
+	this._buffer = value
 end constructor
 
-operator ustring.+=(byref value as zstring)
-	if ( len(value) < this._bufferSize - this._length) then
-		memcpy(this._buffer + this._length, @value, len(value))
-		this._length += len(value)
-	else
-		this._buffersize += len(value)
-		this._buffer = reallocate(this._buffer, this._buffersize)
-		memcpy(this._buffer + this._length, @value, len(value))
-		this._length += len(value)
-	endif
+operator ustring.+=(byref value as string)
+	this._buffer += value
 	this._characters = 0 ' reset the char count
 end operator
 
 operator ustring.+=(byref value as ustring)
-	if ( value._buffersize < this._bufferSize - this._length) then
-		memcpy(this._buffer + this._length, value._buffer, value._length)
-		this._length += value._length
-	else
-		this._buffersize += value._buffersize - chunksize
-		this._buffer = reallocate(this._buffer, this._buffersize)
-		memcpy(this._buffer + this._length, value._buffer, value._length)
-		this._length += value._length
-	endif
+	this._buffer = value._buffer
 	this._characters = 0 ' reset the char count	
 end operator
 
-operator ustring.cast() byref as zstring
-	return *this._buffer
+operator ustring.cast() byref as string
+	return this._buffer
 end operator
 
 property ustring.Length() as uinteger
 	if ( this._characters = 0) then
-		this._characters = this.GetcharCount()
+		this._characters = CountCharacters(this._buffer)
 	end if
 	return this._characters
 end property
@@ -196,10 +163,6 @@ end property
 property ustring.Size() as uinteger
 	return this._length
 end property
-
-function ustring.GetcharCount() as uinteger
-	return CountCharacters(this._buffer)
-end function
 
 function ustring.CharToByte(byval index as uinteger) as long
 	dim codepoint as ubyte 
@@ -228,7 +191,7 @@ function ustring.Instr(byref expression as ustring, byval start as uinteger = 0)
 		if i > this._length - expressionLength then
 			exit do
 		end if
-		if memcmp(this._buffer + i, expression._buffer, expressionLength) = 0 then
+		if memcmp(strptr(this._buffer) + i, strptr(expression._buffer), expressionLength) = 0 then
 			dim charCount as uinteger
 			dim codePoint as ubyte
 			dim j as uinteger
@@ -249,46 +212,79 @@ function ustring.Instr(byref expression as ustring, byval start as uinteger = 0)
 	return -1
 end function
 
+function ustring.Instr(byref expression as string, byval start as uinteger = 0) as long
+	'Error case first:
+	dim as uinteger index = this.CharToByte(start)
+	if (index > this._length) then return -1
+	
+	dim as uinteger expressionLength = len(expression)
+	dim as uinteger i = index
+	do 
+		if i > this._length - expressionLength then
+			exit do
+		end if
+		if memcmp(strptr(this._buffer) + i, strptr(expression), expressionLength) = 0 then
+			dim charCount as uinteger
+			dim codePoint as ubyte
+			dim j as uinteger
+			do
+				codePoint = this._buffer[j]
+				if codepoint = 0 then 
+					return -1
+				end if
+				if j > i then return -1
+				if j = i then return charCount
+				charCount += 1
+				j += GetCodepointLength(codePoint)
+			loop until codepoint = 0 OR j >= i
+			return charCount
+		end if
+		i += 1
+	loop 
+	return -1
+end function
+
+
 operator ustring.[](byval index as uinteger) as ustring
 	dim as ustring value
 	dim i as long =  this.CharToByte(index)
 	if (i <> -1) then
-		memcpy(value._buffer, this._buffer + index, GetCodePointLength(this._buffer[i]))
+		value._buffer = mid(this._buffer, CharToByte(index)+1,  GetCodePointLength(this._buffer[i]))
 	end if
 	return value
 end operator
 
 
-function UnescapeUTF8(byval escapedPoint as zstring ptr) as zstring ptr
-	dim as ulong codePoint = valulng("&h" & right(*escapedPoint, len(*escapedPoint)-2))	
-	dim result as zstring ptr
+function UnescapeUTF8(byval escapedPoint as string) as string
+	dim as ulong codePoint = valulng("&h" & right(escapedPoint, len(escapedPoint)-2))	
+	dim result as string
 	
 	if codePoint <= &h7F then
-		result = allocate(1)
+		result = space(1)
 		result[0] = codePoint
 		return result
 	endif
 	
 	if 	(&hD800 <= codepoint AND codepoint <= &hDFFF) OR _
 		(codepoint > &h10FFFD) then
-		return strptr(ustringConstants.replacementChar)
+		return ustringConstants.replacementChar
 	end if
 	
 	if (codepoint <= &h7FF) then
-		result = allocate(2)
+		result = space(2)
 		result[0] = &hC0 OR (codepoint SHR 6) AND &h1F 
 		result[1] = &h80 OR codepoint AND &h3F
 		return result
 	end if
 	if (codepoint <= &hFFFF) then
-		result = allocate(3)
+		result = space(3)
         result[0] = &hE0 OR codepoint SHR 12 AND &hF
         result[1] = &h80 OR codepoint SHR 6 AND &h3F
         result[2] = &h80 OR codepoint AND &h3F
         return result
     end if
 	
-	result = allocate(4)
+	result = space(4)
 	result[0] = &hF0 OR codepoint SHR 18 AND &h7
 	result[1] = &h80 OR codepoint SHR 12 AND &h3F
 	result[2] = &h80 OR codepoint SHR 6 AND &h3F
@@ -297,36 +293,36 @@ function UnescapeUTF8(byval escapedPoint as zstring ptr) as zstring ptr
 	return result
 end function
 
-function EscapedToUtf8(byref escapedPoint as ustring) as zstring ptr
+function EscapedToUtf8(byref escapedPoint as ustring) as string
 	dim as ulong codePoint = valulng("&h" & right(escapedPoint, len(escapedPoint)-2))	
-	dim result as zstring ptr
+	dim result as string
 	
 	if codePoint <= &h7F then
-		result = allocate(1)
+		result = space(1)
 		result[0] = codePoint
 		return result
 	endif
 	
 	if 	(&hD800 <= codepoint AND codepoint <= &hDFFF) OR _
 		(codepoint > &h10FFFD) then
-		return strptr(ustringConstants.replacementChar)
+		return ustringConstants.replacementChar
 	end if
 	
 	if (codepoint <= &h7FF) then
-		result = allocate(2)
+		result = space(2)
 		result[0] = &hC0 OR (codepoint SHR 6) AND &h1F 
 		result[1] = &h80 OR codepoint AND &h3F
 		return result
 	end if
 	if (codepoint <= &hFFFF) then
-		result = allocate(3)
+		result = space(3)
         result[0] = &hE0 OR codepoint SHR 12 AND &hF
         result[1] = &h80 OR codepoint SHR 6 AND &h3F
         result[2] = &h80 OR codepoint AND &h3F
         return result
     end if
 	
-	result = allocate(4)
+	result = space(4)
 	result[0] = &hF0 OR codepoint SHR 18 AND &h7
 	result[1] = &h80 OR codepoint SHR 12 AND &h3F
 	result[2] = &h80 OR codepoint SHR 6 AND &h3F
@@ -336,9 +332,9 @@ function EscapedToUtf8(byref escapedPoint as ustring) as zstring ptr
 end function
 
 function left overload (byref value as ustring, byval length as uinteger) as ustring
-	return left(*value._buffer, value.CharToByte(length))
+	return left(value._buffer, value.CharToByte(length))
 end function
 
 function right overload (byref value as ustring, byval length as uinteger) as ustring
-	return *(value._buffer + value.CharToByte(len(value)-length) ) 
+	return right(value._buffer, value.CharToByte(len(value)-length))
 end function
