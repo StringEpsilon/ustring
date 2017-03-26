@@ -245,6 +245,18 @@ function ustring.Instr(byref expression as string, byval start as uinteger = 0) 
 end function
 
 
+operator ustring.[](byval index as uinteger, byref value as ustring)
+	dim as ustring value
+	dim i as long =  this.CharToByte(index)
+	if (i <> -1) then
+		' figure out lengths
+		' 
+		' copy char over
+		'
+	end if
+	return value
+end operator
+
 operator ustring.[](byval index as uinteger) as ustring
 	dim as ustring value
 	dim i as long =  this.CharToByte(index)
